@@ -230,7 +230,9 @@ ImageProcessing.prototype.HistogramEqualization = function()
     var norm = 255 / (imgData.width * imgData.height);
 
     for (var i = 0; i < imgData.data.length; i += 4) 
+    {
         imgData.data[i] = this.histogram[imgData.data[i]] * norm;
+    }
 
     this.PutPixels(imgData);
 }
