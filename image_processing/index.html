@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Biometría. MUIARFID 2015-2016. Image filters sample APP</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+
+	<link rel="stylesheet" type="text/css" href="css/reset.css">
+	<link rel="stylesheet" type="text/css" href="css/style.css">
+
+	<style type="text/css">
+	#image_list{
+		list-style: none;
+		padding: 0; margin:0;
+	}
+	#image_list > li{
+		float:left;
+		margin-right: 15px;
+	}
+	#image_list > li > img{
+		/*max-width: 220px;*/
+		max-height: 280px;
+		padding:10px;
+		cursor: pointer;
+	}
+	.selected_image{
+		background:rgba(247, 136, 34, 0.15);
+		border: 1px solid #666;
+	}
+	h2{
+		display:block;text-align:center;width:100%
+	}
+	#canvaswrapper{
+		width:45%;
+		float:left;
+		text-align: right;
+		margin-right: 4%;
+	}
+	#guiwrapper{
+		float:left;
+		display: inline-block;
+	}
+	#histogramChart{
+		height:120px;
+		background: #fff;
+
+	}
+	#histogramChartWrapper{
+		float:right;
+		width:280px;
+		display: inline-block;
+		text-align: center;
+
+		padding: 15px;
+		border-left: 1px solid #666;
+	}
+	</style>
+</head>
+
+<body>
+		<header id="header" class="">
+			<h1 id="logo"><a href="http://www.tonnyesp.com/">DevBlog <span>Tonny Ruiz-Gijón</span></a></h1>
+			<nav id="nav">
+	            <ul>
+					<li id="play-button" class="first" style="white-space: nowrap;">
+					    <a href="http://www.tonnyesp.com" title="Ejercicio de Biometría" class="first"> <i class="fa fa-home"></i> Home</a>
+					</li>
+
+	            </ul>
+	        </nav>
+		</header>
+<div class="container" style="margin-top:80px">
+		<h2 style="display:block;text-align:center;width:100%;">Image processing sample APP</h2>
+
+		<div id="canvaswrapper">
+			<span style="padding-right:80px">Imagen original</span><br/>
+			<canvas id="myCanvas" width="0" height="0" style="border:1px solid #d3d3d3;">
+				Your browser does not support the HTML5 canvas tag.
+			</canvas>
+			<canvas id="myCanvas_temporal" width="0" height="0" style="border:1px solid #d3d3d3;">
+				Your browser does not support the HTML5 canvas tag.
+			</canvas>
+		</div>
+		<div id="guiwrapper">
+
+		</div>
+		<div id="histogramChartWrapper">
+			Histograma y su CDF: <br/>
+			<div id="histogramChart"></div>
+			<br/>
+			Imagen integral:<br/>
+			<canvas id="myCanvas_integralImage" width="0" height="0" style="border:1px solid #d3d3d3;">
+				Your browser does not support the HTML5 canvas tag.
+			</canvas>
+		</div>
+
+</div>
+
+	<div style="border-top: 1px solid #666;padding:15px;"> 
+		<h2>Elige otra imagen</h2>
+		<ul id="image_list">
+
+			<li>
+				<img class="selected_image" src="data/cs_face_db_01.jpg" alt="Face 0">
+			</li>
+
+
+			<li>
+				<img src="data/cs_face_db_02.jpg" alt="Face 1">
+			</li>
+
+			<li>
+				<img src="data/cs_face_db_03.jpg" alt="Face 1">
+			</li>
+
+			<li>
+				<img src="data/cs_face_db_06.jpg" alt="Face 1">
+			</li>
+
+			<li>
+				<img src="data/cs_face_db_07.jpg" alt="Face 1">
+			</li>
+
+			<li>
+				<img src="data/cs_face_db_19.jpg" alt="Face 1">
+			</li>
+
+			<li>
+				<img src="data/cs_face_db_26.jpg" alt="Face 1">
+			</li>
+		</ul>
+
+
+
+	</div>
+
+</div>
+<script src="js/jquery.min.js"></script>
+<script src="js/jquery.canvasjs.min.js"></script>
+<script src="js/dat.gui.min.js"></script>
+<script src="js/ImageProcessing.js"></script>
+
+<script type="text/javascript">
+// Hace un plot del histograma y su CDF
+function PlotHistogram(hist, cdf)
+{
+	var limit = hist.length - 1;
+
+	var data = []; var dataSeries = { type: "column", color: "#B0D0B0" };
+	var dataPoints = [];
+	for (var i = 0; i < hist.length; i ++) {
+		var point = 
+		{
+			x: i,
+			y: hist[i] * 10
+		}
+
+		dataPoints.push(point);
+	}
+	dataSeries.dataPoints = dataPoints;
+	data.push(dataSeries);
+
+
+	var data2 = []; var dataSeries2 = { type: "line", color:"#1E90FF" };
+	var dataPoints2 = [];
+	for (var i = 0; i < cdf.length; i ++) {
+		var point = 
+		{
+			x: i,
+			y: cdf[i]
+		}
+
+		dataPoints2.push(point);
+	}
+	dataSeries2.dataPoints = dataPoints2;
+
+	data.push(dataSeries2);
+
+	var chart = new CanvasJS.Chart("histogramChart",
+	{
+		zoomEnabled: true,
+		panEnabled: false, 
+
+		axisY:{
+			maximum: 1.0,
+			minimum: 0.0,
+			lineThickness:0,
+			tickThickness:0,
+			valueFormatString: ""
+		},
+
+		axisX:{
+			maximum: 256,
+			lineThickness:0,
+			tickThickness:0,
+			valueFormatString: ""
+		},
+		data: data
+    });
+
+	chart.render();
+}
+
+var Restart = function()
+{
+	ip.LoadImage();
+}
+window.onload = function() {
+
+	var gui = new dat.GUI({ autoPlace: false });
+
+	var customContainer = document.getElementById('guiwrapper');
+	customContainer.appendChild(gui.domElement);
+
+
+	gui.add(this, 'BlackAndWhite').name("Blanco y negro");
+	gui.add(this, 'Invert').name("Invertir colores");
+	gui.add(this, 'Sharpen').name("Enforcar");
+	gui.add(this, 'Sobel').name("Sobel");
+	gui.add(this, 'GaussianBlur').name("Gaussian Blur");
+	gui.add(this, 'Restart').name("Restaurar");
+
+
+};
+
+var BlackAndWhite = function()
+{
+	ip.BlackAndWhite();
+}
+var Invert = function()
+{
+	ip.Invert();
+}
+var Sharpen = function()
+{
+	ip.Sharpen();
+}
+var Sobel = function()
+{
+	ip.Sobel();
+}
+var GaussianBlur = function()
+{
+	ip.GaussianBlur();
+}
+$('#image_list img').on('click', function() {
+	$(".selected_image").removeClass('selected_image');
+    $(this).addClass('selected_image');
+
+    ip.LoadImage();
+});
+var ip = new ImageProcessing("myCanvas");
+
+</script>
+
+
+	</body>
+</html>

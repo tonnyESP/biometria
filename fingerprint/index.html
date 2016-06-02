@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Biometría. MUIARFID 2015-2016. Fingerprint feature extraction</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+
+	<link rel="stylesheet" type="text/css" href="css/reset.css">
+	<link rel="stylesheet" type="text/css" href="css/style.css">
+
+	<style type="text/css">
+	#fingerprints{
+		list-style: none;
+		padding: 0; margin:0;
+	}
+	#fingerprints > li{
+		float:left;
+		margin-right: 15px;
+	}
+	#fingerprints > li > img{
+		/*max-width: 220px;*/
+		max-height: 280px;
+		cursor: pointer;
+				padding:3px;
+
+	}
+	.selected_fingerprint{
+		border: 1px solid #666;
+		background: rgba(247, 136, 34, 0.15);
+	}
+	#fingerprint_process{ 
+		display: block; 
+	}
+	h2{
+		display:block;text-align:center;width:100%
+	}
+	#canvaswrapper{
+		width:45%;
+		float:left;
+		text-align: right;
+		margin-right: 4%;
+	}
+	#guiwrapper{
+		float:left;
+		width: 245px;
+	}
+	#histogramChart{
+		float:right;
+		width:250px;
+		height:120px;
+		background: #fff;
+	}
+	</style>
+</head>
+
+<body>
+		<header id="header" class="">
+			<h1 id="logo"><a href="http://www.tonnyesp.com/">DevBlog <span>Tonny Ruiz-Gijón</span></a></h1>
+			<nav id="nav">
+	            <ul>
+					<li id="play-button" class="first" style="white-space: nowrap;">
+					    <a href="http://www.tonnyesp.com" title="Ejercicio de Biometría" class="first"> <i class="fa fa-home"></i> Home</a>
+					</li>
+
+	            </ul>
+	        </nav>
+		</header>
+<div class="container" style="margin-top:80px">
+
+	<div id="fingerprint_process">
+		<h2 style="display:block;text-align:center;width:100%;">Activate one by one the preprocessing techniques</h2>
+
+		<div id="canvaswrapper">
+			<canvas id="myCanvas" width="0" height="0" style="border:1px solid #d3d3d3;">
+				Your browser does not support the HTML5 canvas tag.
+			</canvas>
+
+		</div>
+		<div id="guiwrapper">
+
+		</div>
+		<div id="histogramChart"></div>
+
+		</div>
+	</div>
+
+	<div style="border-top: 1px solid #666;padding:15px;"> 
+		<h2>Select the fingerprint to extract features at</h2>
+		<ul id="fingerprints">
+
+			<li>
+				<img src="data/fingerprint0.jpg" alt="Fingerprint 0">
+			</li>
+
+
+			<li>
+				<img src="data/fingerprint1.jpg" alt="Fingerprint 1">
+			</li>
+
+			<li>
+				<img src="data/color.png" alt="Fingerprint 2">
+			</li>
+
+			<li>
+				<img src="data/demo_small.png" alt="Fingerprint 3">
+			</li>
+
+			<li>
+				<img class="selected_fingerprint" src="data/black.png" alt="Fingerprint 3">
+			</li>
+		</ul>
+
+
+
+	</div>
+
+</div>
+<script src="js/jquery.min.js"></script>
+<script src="js/jquery.canvasjs.min.js"></script>
+<script src="js/dat.gui.min.js"></script>
+
+
+<script type="text/javascript">
+
+// GLOBAL!!!!
+var c;
+var ctx ;
+var img ;
+
+
+// Hace un plot del histograma y su CDF
+function PlotHistogram(hist, cdf)
+{
+	var limit = hist.length - 1;
+
+
+	var data = []; var dataSeries = { type: "column", color: "#B0D0B0" };
+	var dataPoints = [];
+	for (var i = 0; i < hist.length; i ++) {
+		var point = 
+		{
+			x: i,
+			y: hist[i] * 10
+		}
+
+		dataPoints.push(point);
+	}
+	dataSeries.dataPoints = dataPoints;
+	data.push(dataSeries);
+
+
+	var data2 = []; var dataSeries2 = { type: "line", color:"#1E90FF" };
+	var dataPoints2 = [];
+	for (var i = 0; i < cdf.length; i ++) {
+		var point = 
+		{
+			x: i,
+			y: cdf[i]
+		}
+
+		dataPoints2.push(point);
+	}
+	dataSeries2.dataPoints = dataPoints2;
+
+	data.push(dataSeries2);
+
+	var chart = new CanvasJS.Chart("histogramChart",
+	{
+		zoomEnabled: true,
+		panEnabled: false, 
+
+		axisY:{
+			maximum: 1.0,
+			lineThickness:0,
+			tickThickness:0,
+			valueFormatString: ""
+		},
+
+		axisX:{
+			maximum: 256,
+			lineThickness:0,
+			tickThickness:0,
+			valueFormatString: ""
+		},
+		data: data
+    });
+
+	chart.render();
+
+}
+function GetMeanAndSigma(data)
+{
+	var total = 0;
+	var count = 0;
+	for (var i = 0; i < data.length; i += 4){
+		total += parseFloat(data[i]);
+
+		count ++;
+	};
+	var mean = total / count;
+
+	// reset counter
+	count = 0;
+
+	var totalVariance = 0;
+	for (var i = 0; i < data.length; i += 4){
+		var vari = data[i] - mean;
+		totalVariance += (vari * vari);
+
+		count++;
+	};
+
+	var variance = Math.sqrt( totalVariance / count);
+
+	return {'mean': mean, 'variance': variance};
+}
+// Calcula el histograma y su CDF
+function GetHistogram() 
+{
+	var hist = Array(256).fill(0);
+	var cdf  = Array(256).fill(0);
+
+	var imgData = ctx.getImageData(0, 0, c.width, c.height);
+
+
+	var pixcount = 0;
+	// Solo gastaremos el color rojo, porque en principio debe estar la imagen en blanco y negro
+	for (var i = 0; i < imgData.data.length; i += 4)
+	{
+		hist[imgData.data[i]] ++;
+		pixcount ++;
+	}
+
+	// Píxeles en la imagen (no es necesario que esté dividido por 4, que son los 4 valores de rgba. width y height devuelven el tamaño bueno)
+	var n = (imgData.width * imgData.height) ;
+
+	// Normalización histograma (flat)
+	for (var i = 0; i < hist.length; i++)
+		hist[i] = hist[i] / n ;
+
+	// Función de distribución acumulada
+	cdf[0] = hist[0];
+	for (var i = 1; i < hist.length; i++)
+		cdf[i] = hist[i] + cdf[i-1];
+
+	// Ploteamos para ver qué aspecto tiene el histograma y su cdf
+	PlotHistogram(hist, cdf);
+
+	return { 'hist': hist, 'cdf': cdf};
+}
+
+
+
+function LoadImageInCanvas() {
+	c   = document.getElementById("myCanvas");
+	ctx = c.getContext("2d");
+	img = document.getElementsByClassName("selected_fingerprint")[0];
+
+    $("#myCanvas").attr("width", img.width);
+    $("#myCanvas").attr("height", img.height)
+
+    ctx.drawImage(img, 0, 0, img.width, img.height);
+
+    $("#histogramChart").css("height", $(".dg").height());
+
+    // Ploteamos el histograma
+    GetHistogram();
+
+}
+
+$('#fingerprints img').on('click', function() {
+	$(".selected_fingerprint").removeClass('selected_fingerprint');
+    $(this).addClass('selected_fingerprint');
+    LoadImageInCanvas();
+    $("#fingerprint_process").show();
+});
+
+
+// Normaliza la imagen globalmente para todos sus píxeles
+var GlobalNormalization = function()
+{
+	var imgData = ctx.getImageData(0, 0, c.width, c.height);
+
+	var normal = GetMeanAndSigma(imgData.data);
+
+	for (var i = 0; i < imgData.data.length; i += 4)
+	{
+
+		imgData.data[i]   = Math.round(imgData.data[i] - normal.mean) / normal.variance;
+	  	imgData.data[i+1] = Math.round(imgData.data[i+1] - normal.mean) / normal.variance;
+	  	imgData.data[i+2] = Math.round(imgData.data[i+2] - normal.mean) / normal.variance;
+	  	imgData.data[i+3] = 255;	 
+	}
+
+	ctx.putImageData(imgData, 0, 0);
+
+}
+
+var LocalEqualization = function()
+{
+
+	var histAndCdf = GetHistogram();
+	var hist = histAndCdf.hist;
+	var cdf  = histAndCdf.cdf;
+
+	var imgData = ctx.getImageData(0, 0, c.width, c.height);
+
+	// Píxeles en la imagen (dividido 4 que son los 4 valores de rgba)
+	var n = (imgData.width * imgData.height);
+
+	for (var i = 0; i < imgData.data.length; i += 4)
+	{
+
+		imgData.data[i]   = (cdf[imgData.data[i]] * imgData.data[i] / 254);
+	  	imgData.data[i+1] = (cdf[imgData.data[i+1]] * imgData.data[i+1] / 254);
+	  	imgData.data[i+2] = (cdf[imgData.data[i+2]] * imgData.data[i+1] / 254);
+	  	imgData.data[i+3] = 255;
+	}
+
+	// Después de calcularlo, se devuelve a la imagen del canvas
+	ctx.putImageData(imgData, 0, 0);
+
+}
+var BlackAndWhite = function()
+{
+	var imgData = ctx.getImageData(0, 0, c.width, c.height);
+
+	for (var i = 0; i < imgData.data.length; i += 4)
+	{
+		// bnvalue = 0.299×r + 0.587×g + 0.114×b
+		var bnvalue = Math.round( imgData.data[i] * 0.299 + imgData.data[i+1] * 0.587 + imgData.data[i+2] * 0.114);
+
+		imgData.data[i]   = bnvalue;
+	  	imgData.data[i+1] = bnvalue;
+	  	imgData.data[i+2] = bnvalue; 
+	  	imgData.data[i+3] = 255;		 
+	}
+
+	// Después de calcularlo, se devuelve a la imagen del canvas
+	ctx.putImageData(imgData, 0, 0);
+
+}
+
+var Restart = function()
+{
+	LoadImageInCanvas();
+}
+window.onload = function() {
+
+	LoadImageInCanvas();
+
+	var gui = new dat.GUI({ autoPlace: false });
+
+	var customContainer = document.getElementById('guiwrapper');
+	customContainer.appendChild(gui.domElement);
+
+	var globales = gui.addFolder("Técnicas Globales");
+	globales.open();
+	globales.add(this, 'GlobalNormalization').name("Normalización Global");
+	
+	gui.add(this, 'BlackAndWhite').name("Blanco y Negro");
+	
+	gui.add(this, 'LocalEqualization').name("Ecualización local");
+	gui.add(this, 'Restart').name("Restaurar");
+
+
+};
+</script>
+
+
+	</body>
+</html>

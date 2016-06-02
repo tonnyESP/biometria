@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Biometría. MUIARFID 2015-2016. ROC Curve</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link rel="stylesheet" type="text/css" href="css/reset.css">
+	<link rel="stylesheet" type="text/css" href="css/style.css">
+<style type="text/css">
+	#datasets{
+		list-style: none;
+		padding: 0; margin:0;
+	}
+	#datasets > li{
+		float:left;
+		margin-right: 15px;
+		padding:15px;
+		display: inline-block;
+	}
+	#datasets > li > a{
+		/*max-width: 220px;*/
+		padding:15px;
+		border:1px solid #ddd;
+		cursor:pointer;
+	}
+	.selected_dataset, .selected_dataset2{
+		background:rgba(247, 136, 34, 0.15);
+		border: 1px solid #666;
+	}
+	.selected_dataset2{
+		background:rgba(10, 34, 247, 0.15);
+	}
+	h2{
+		display:block;text-align:center;width:100%
+	}
+</style>
+
+</head>
+
+<body>
+		<header id="header" class="">
+			<h1 id="logo"><a href="http://www.tonnyesp.com/">DevBlog <span>Tonny Ruiz-Gijón</span></a></h1>
+			<nav id="nav">
+	            <ul>
+					<li id="play-button" class="first" style="white-space: nowrap;">
+					    <a href="http://www.tonnyesp.com" title="Ejercicio de Biometría" class="first"> <i class="fa fa-home"></i> Home</a>
+					</li>
+
+	            </ul>
+	        </nav>
+		</header>
+
+<div class="container" style="margin-top: 80px;">
+	<h2 style="margin-bottom:3px;">Curva ROC</h2>
+	<span> Puedes hallar el FP(FN=x) y FN(FP=x) con su threshold desplazando el cursor por la gráfica. El punto FN=FP está indicado con un triángulo rojo. El AUC y la D-PRIME están calculados e indicados debajo de cada curva</span>
+
+	<div style="height:25px; clear:both"></div>
+	<div class="chartWrapper" style="width:45%;float:left;margin-right:3%;">
+		<div id="chartContainer" class="chart" style="height: 50vh; border: 1px solid #666;"></div>
+		<div class="extra_info" style="text-align:center;background:#fff;border:1px solid #666;border-top:0;"></div>
+	</div>
+	
+	<div class="chartWrapper" style="width:45%;float:left;">
+		<div id="chartContainer2" class="chart" style="height: 50vh; border: 1px solid #666;"></div>
+		<div class="extra_info" style="text-align:center;background:#fff;border:1px solid #666;border-top:0;"></div>
+	</div>
+	<div style="height:10px;clear:both"></div>
+	<div style="border-top: 1px solid #666;padding:15px;"> 
+		<span style="font-size:12pt;margin-top:-10px;">(Con el <strong>botón primario</strong> seleccionas los datos para la gráfica de la <strong>izquierda</strong>, con el botón secundario seleccionas los datos para la gráfica de la derecha)</span>
+
+		<h2>Puedes seleccionar otros datos</h2>
+		<ul id="datasets">
+
+			<li>
+				<a href="#" class="selected_dataset">scoresA</a>
+			</li>
+
+
+			<li>
+				<a href="#" class="selected_dataset2">scoresB</a>
+			</li>
+
+			<li>
+				<a href="#">scoresTranspas</a>
+			</li>
+
+			<li>
+				<a href="">scoresExamen2014</a>
+			</li>
+			<li>
+				<a href="">scoresExamen2015_1</a>
+			</li>
+			<li>
+				<a href="">scoresExamen2015_2</a>
+			</li>
+		</ul>
+
+
+
+	</div>
+
+</div>
+<script src="js/jquery.min.js"></script>
+<script src="js/jquery.canvasjs.min.js"></script>
+<script src="https://d3js.org/d3.v4.0.0-alpha.44.min.js"></script>
+<script src="js/gaussian.js"></script>
+
+<script type="text/javascript">
+// Botón primario
+$('#datasets a').on('click', function(evt) {
+	$(".selected_dataset").removeClass('selected_dataset');
+    $(this).addClass('selected_dataset');
+	evt.preventDefault();
+    RunRocCurve();
+});
+// Botón derecho
+$('#datasets a').on('contextmenu', function(evt) {
+	$(".selected_dataset2").removeClass('selected_dataset2');
+    $(this).addClass('selected_dataset2');
+    evt.preventDefault();
+    RunRocCurve();
+});
+function sortFloat(a,b) { return a - b; }
+function getMeanAndSigma(data)
+{
+	var total = 0;
+	var count = 0;
+	for (var i = data.length - 1; i >= 0; i--) {
+		total += parseFloat(data[i]);
+
+		count ++;
+	};
+	var mean = total / count;
+
+	// reset counter
+	count = 0;
+
+	var totalVariance = 0;
+	for (var i = data.length - 1; i >= 0; i--) {
+		var vari = data[i] - mean;
+		totalVariance += (vari * vari);
+
+		count++;
+	};
+
+	var variance = Math.sqrt( totalVariance / count);
+
+	return {'mean': mean, 'variance': variance};
+}
+function getAUC(dataClientes, dataImpostores)
+{
+
+	var auc = 0;
+
+	for (var i = 0; i < dataClientes.length; i++) {
+		for (var j = 0; j < dataImpostores.length; j++) {
+			if(	dataClientes[i] >  dataImpostores[j] )
+				auc ++;
+		};
+
+	};
+
+	auc = auc / (dataClientes.length * dataImpostores.length)
+
+	return auc;
+}
+function getFNandThresholdFromFP(fp)
+{
+
+}
+
+clientes   = [];
+impostores = [];
+thresholds = [];
+
+function LoadSystemData(systemName, chartContainer, clientesLoaded)
+{
+	// Si es la primera vez todavía no hemos cargado los clientes 
+    clientesLoaded = clientesLoaded || false;
+
+    impostores[systemName] = [];
+
+    if (!clientesLoaded)
+    {
+    	clientes[systemName] = [];
+
+    	d3.tsv("data/"+systemName+"_clientes", function(data) {
+			// Se coge únicamente el score de la lista que se ha dado
+			data.forEach(function(d) {
+		   		clientes[systemName].push(d.score);
+			});
+			// Ya podemos cargar los impostores
+			LoadSystemData(systemName, chartContainer, true);
+		});
+
+    }
+    // Cargamos los impostores
+    else
+    {
+    	impostores[systemName] = [];
+
+    	d3.tsv("data/"+systemName+"_impostores", function(data) {
+			// Se coge únicamente el score de la lista que se ha dado
+			data.forEach(function(d) {
+		   		impostores[systemName].push(d.score);
+			});
+
+			PlotROC(clientes[systemName], impostores[systemName], chartContainer, systemName);
+		});
+    }
+}
+
+function uniqueNum(arr) {
+    return Object.keys(arr.reduce(
+        function(o, x) {o[x]=1; return o;}, {})).map(Number);
+}  
+
+function PlotROC(dataClientes, dataImpostores, chartContainer, systemName)
+{
+	// Para tener el array de thresholds, concatenamos ambas arrays
+	thresholds[systemName] = dataClientes.concat(dataImpostores);
+
+	thresholds[systemName] = uniqueNum(thresholds[systemName]);
+	thresholds[systemName].sort(sortFloat);
+
+	// Total de Falsos Positivos y Verdaderos positivos
+	// Vector que relaciona los valores de FP y FN para un cierto Threshold
+	var FPR = [];
+	var VPR = [];
+	var THR = [];
+
+	// Para conocer el FN = FP acumulamos el valor que menor distancia entre ambos dé
+	var distFNtoFP = 99999999999;  // Inicializada a un valor muy alto
+	var FNequalFP = {fn: -1, fp: -1};   // Guardamos el id en el vector de FP / FN
+
+	for (var i = 0; i < thresholds[systemName].length; i++) 
+	{
+		var tmpFN = 0;
+		var tmpFP = 0;
+
+		for (var j = 0; j < dataClientes.length; j++) {
+			if( dataClientes[j] <= thresholds[systemName][i] )
+				tmpFN ++;
+		};
+
+		for (var j = 0; j < dataImpostores.length; j++) {			
+			if( dataImpostores[j] >= thresholds[systemName][i] )
+				tmpFP ++;
+		};
+
+		var fn = (tmpFN / dataClientes.length);
+		var fp = (tmpFP / dataImpostores.length);
+		var tmpDist = (fn - fp) * (fn - fp);
+		if( tmpDist < distFNtoFP)
+		{
+			distFNtoFP = tmpDist;
+			FNequalFP.fn = i;
+			FNequalFP.fp = i;
+		}
+
+		VPR.push( 1 - fn );
+		FPR.push( fp );
+		THR.push(thresholds[systemName][i]);
+	};
+
+
+	// Ordenamos todo y calculamos las características de la distribución normal que cumplen
+	dataClientes.sort(sortFloat);
+	dataImpostores.sort(sortFloat);
+	var clientesND   = getMeanAndSigma(dataClientes);
+	var impostoresND = getMeanAndSigma(dataImpostores);
+
+	// Se calcula la D-PRIME y se indica debajo de la gráfica
+	var d_prime = ( clientesND.mean - impostoresND.mean) / (Math.sqrt(clientesND.variance * clientesND.variance + impostoresND.variance * impostoresND.variance));
+
+	// Se calcula el área debajo de la curva generada
+	var auc = getAUC(dataClientes, dataImpostores);
+
+	$( "#"+chartContainer ).next( " .extra_info " ).append( "<strong>D-PRIME:</strong> "+d_prime.toFixed(6));
+	$( "#"+chartContainer ).next( " .extra_info " ).append( "<br/><strong>AUC:</strong> "+auc.toFixed(6));
+	$( "#"+chartContainer ).next( " .extra_info " ).append( "<br/><strong>FN=FP:</strong> "+FPR[FNequalFP.fp].toFixed(6));
+
+
+	//var g = new gaussian(clientesND.mean, clientesND.variance)
+	//FPR.sort(sortFloat);
+
+	var limit = 1.0;//FPR[FPR.length-1];
+	
+
+	var data = []; var dataSeries = { type: "area" };
+	var dataPoints = [];
+	for (var i = 0; i < FPR.length; i ++) {
+
+		var point = 
+		{
+			x: FPR[i],
+			y: VPR[i], //parseFloat(dataClientes[i]) //g.pdf(i)
+			z: THR[i]
+		}
+		// Si estamos en el punto FN = FP
+		if(i == FNequalFP.fp)
+		{
+			point.indexLabel = "FN = FP";
+			point.markerColor = "red";
+			point.markerType = "triangle";
+			point.markerSize = 10;	
+		}
+
+
+		dataPoints.push(point);
+
+	}
+	dataSeries.dataPoints = dataPoints;
+	data.push(dataSeries);
+
+	var chart = new CanvasJS.Chart(chartContainer,
+	{
+		zoomEnabled: true,
+		panEnabled: true, 
+
+		title:{
+			text: "ROC Curve for "+systemName 
+		},
+		legend: {
+			horizontalAlign: "right",
+			verticalAlign: "center"        
+		},
+		axisX:{
+			title: "FPR"
+		},
+		axisY:{
+			title: "1 - FNR",
+			maximum: 1.0
+
+		},
+		data: [{
+			dataPoints: dataPoints,
+			type: "stepLine",
+			//toolTipContent: "FP {x}, FN:"+1-parseFloat("{y}"),
+		}],
+		toolTip:{
+			enabled: true,
+			animationEnabled: true,
+			contentFormatter: function (e) {
+				var content = " ";
+				//for (var i = 0; i < e.entries.length; i++) {
+					content += "<strong> FP: </strong>" + parseFloat(e.entries[0].dataPoint.x).toFixed(4) + ", <strong>FN: </strong>" + (1 - parseFloat(e.entries[0].dataPoint.y)).toFixed(4);
+					content += "<br/> Threshold:"+e.entries[0].dataPoint.z;
+				//}
+				return content;
+			}
+		}
+    });
+
+	chart.render();
+
+
+}
+
+function RunRocCurve()
+{
+
+	// Cargará lo seleccionado
+	// 
+	var dataset1 = $(".selected_dataset").text();
+	var dataset2 = $(".selected_dataset2").text();
+
+	$(".extra_info").text("");
+
+	LoadSystemData(dataset1, "chartContainer");
+	LoadSystemData(dataset2, "chartContainer2");
+
+
+
+
+}
+
+RunRocCurve();
+	
+</script>
+
+
+	</body>
+</html>
